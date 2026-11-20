@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Haik.io — Détection de formes et de couleurs</title>
+  <meta name="description" content="Haik.io détecte les formes et les couleurs en temps réel : webcam, dessin ou image.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="index.css">
+</head>
+
+<body>
+
+  <!-- Icônes réutilisables -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-cam" viewBox="0 0 24 24"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></symbol>
+    <symbol id="i-pen" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></symbol>
+    <symbol id="i-img" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+    <symbol id="i-eraser" viewBox="0 0 24 24"><path d="M20 20H9l-5-5a2 2 0 0 1 0-3l9-9a2 2 0 0 1 3 0l5 5a2 2 0 0 1 0 3l-8 8"/><path d="M7 13l6 6"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M7 17L17 7"/><path d="M8 7h9v9"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></symbol>
+  </svg>
+
+  <!-- ===================== LANDING ===================== -->
+  <main id="landing" class="vue active">
+
+    <header class="nav">
+      <a class="logo" href="#accueil" data-scroll="accueil">
+        <span class="logo-mark">H</span>Haik<span class="logo-dot">.io</span>
+      </a>
+      <nav class="nav-links">
+        <a href="#fonctionnement" data-scroll="fonctionnement">Fonctionnement</a>
+        <a href="#modes" data-scroll="modes">Modes</a>
+        <a href="#newsletter" data-scroll="newsletter">Nous contacter</a>
+      </nav>
+      <button class="btn btn-dark" data-demo>Lancer la démo</button>
+    </header>
+
+    <section class="hero reveal" id="accueil">
+      <div class="hero-card">
+        <div class="hero-bg" aria-hidden="true">
+          <span class="blob b1"></span><span class="blob b2"></span>
+          <span class="forme f-cercle"></span>
+          <span class="forme f-carre"></span>
+          <span class="forme f-triangle"></span>
+          <span class="forme f-etoile">★</span>
+          <span class="forme f-losange"></span>
+        </div>
+        <div class="hero-texte">
+          <span class="badge">Vision par ordinateur</span>
+          <h1>Découvre la magie de la <span class="surlign">détection</span> en direct !</h1>
+          <p>Haik.io reconnaît les formes et les couleurs à partir de ta webcam, de tes dessins ou de tes images, puis te les décrit en une phrase.</p>
+          <div class="hero-actions">
+            <button class="btn btn-primary" data-demo>Lancer la démo
+              <svg class="ico"><use href="#i-arrow"/></svg></button>
+            <a class="btn btn-ghost" href="#fonctionnement" data-scroll="fonctionnement">Comment ça marche</a>
+          </div>
+        </div>
+        <div class="hero-visuel" aria-hidden="true">
+          <div class="mock">
+            <div class="mock-bar"><i></i><i></i><i></i></div>
+            <div class="mock-scene">
+              <div class="m-obj m-1"><span>cercle rouge · 96%</span></div>
+              <div class="m-obj m-2"><span>carré bleu · 91%</span></div>
+              <div class="m-obj m-3"><span>étoile jaune · 88%</span></div>
+            </div>
+            <p class="mock-phrase">Je vois un cercle rouge, un carré bleu et une étoile jaune.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="chiffres reveal">
+      <div><strong data-count="3">0</strong><span>modes de démo</span></div>
+      <div><strong data-count="8">0</strong><span>formes de base</span></div>
+      <div><strong data-count="100">0</strong><span>% en temps réel</span></div>
+    </section>
+
+    <section class="section reveal" id="fonctionnement">
+      <h2>Simple comme un, deux, trois</h2>
+      <p class="sous-titre">Choisis une source, laisse le modèle analyser, lis le résultat.</p>
+      <div class="etapes">
+        <article class="etape">
+          <span class="num">1</span>
+          <h3>Choisis ta source</h3>
+          <p>Active la webcam, dessine une forme ou envoie une image depuis ton ordinateur.</p>
+        </article>
+        <article class="etape etape-vedette">
+          <span class="num">2</span>
+          <h3>Le modèle analyse</h3>
+          <p>Haik.io repère chaque objet, sa forme, sa couleur et son niveau de confiance.</p>
+        </article>
+        <article class="etape">
+          <span class="num">3</span>
+          <h3>Lis la réponse</h3>
+          <p>Une phrase claire décrit la scène, avec des cadres tracés sur les objets détectés.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section reveal" id="modes">
+      <h2>Trois façons d'essayer</h2>
+      <p class="sous-titre">Chaque mode a son historique et sa réponse du modèle.</p>
+      <div class="modes">
+        <article class="mode">
+          <div class="mode-ico"><svg class="ico"><use href="#i-cam"/></svg></div>
+          <h3>Webcam</h3>
+          <p>Détection en temps réel avec suivi des objets et lecture vocale de la phrase.</p>
+          <button class="lien" data-demo="webcam">Essayer <svg class="ico"><use href="#i-arrow"/></svg></button>
+        </article>
+        <article class="mode">
+          <div class="mode-ico"><svg class="ico"><use href="#i-pen"/></svg></div>
+          <h3>Dessin</h3>
+          <p>Stylo, gomme, couleurs et formes de base. Retrouve, modifie et renvoie tes dessins.</p>
+          <button class="lien" data-demo="dessin">Essayer <svg class="ico"><use href="#i-arrow"/></svg></button>
+        </article>
+        <article class="mode">
+          <div class="mode-ico"><svg class="ico"><use href="#i-img"/></svg></div>
+          <h3>Image</h3>
+          <p>Envoie une photo ou une capture et obtiens la description des formes qu'elle contient.</p>
+          <button class="lien" data-demo="image">Essayer <svg class="ico"><use href="#i-arrow"/></svg></button>
+        </article>
+      </div>
+    </section>
+
+    <section class="cta reveal">
+      <div>
+        <h2>Prêt à voir ce que Haik.io voit ?</h2>
+        <p>Autorise ta caméra ou dessine simplement quelque chose.</p>
+      </div>
+      <button class="btn btn-primary" data-demo>Lancer la démo</button>
+    </section>
+
+    <section class="newsletter reveal" id="newsletter">
+      <div class="nl-texte">
+        <h2>Abonne-toi à la newsletter</h2>
+        <p>Sois la première personne informée des mises à jour et nouveautés du projet.</p>
+      </div>
+      <form class="nl-form" id="nl-form">
+        <label for="nl-email">Reste informé</label>
+        <div class="nl-ligne">
+          <input id="nl-email" type="email" placeholder="Entre ton e-mail" required>
+          <button class="btn btn-primary" type="submit">S'abonner</button>
+        </div>
+        <small id="nl-msg">En t'abonnant, tu acceptes notre <a href="#">politique de confidentialité</a>.</small>
+      </form>
+    </section>
+
+    <footer class="footer">
+      <div class="footer-marque">
+        <a class="logo" href="#accueil" data-scroll="accueil"><span class="logo-mark">H</span>Haik<span class="logo-dot">.io</span></a>
+        <p>Les formes et les couleurs,<br>décrites simplement.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Démo</h4>
+        <a href="#" data-demo="webcam">Webcam</a>
+        <a href="#" data-demo="dessin">Dessin</a>
+        <a href="#" data-demo="image">Image</a>
+      </div>
+      <div class="footer-col">
+        <h4>Projet</h4>
+        <a href="#fonctionnement" data-scroll="fonctionnement">Fonctionnement</a>
+        <a href="#modes" data-scroll="modes">Modes</a>
+        <a href="#newsletter" data-scroll="newsletter">Newsletter</a>
+      </div>
+      <div class="footer-col">
+        <h4>Légal</h4>
+        <a href="#">Confidentialité</a>
+        <a href="#">Conditions</a>
+        <a href="#">Cookies</a>
+      </div>
+    </footer>
+  </main>
+
+  <!-- ===================== DÉMO ===================== -->
+  <div id="demo" class="vue">
+    <header class="demo-top">
+      <a class="logo" href="#" data-home><span class="logo-mark">H</span>Haik<span class="logo-dot">.io</span></a>
+
+      <nav class="onglets" role="tablist" aria-label="Pages de la démo">
+        <button class="onglet active" data-page="webcam" role="tab">
+          <svg class="ico"><use href="#i-cam"/></svg><span>Webcam</span></button>
+        <button class="onglet" data-page="dessin" role="tab">
+          <svg class="ico"><use href="#i-pen"/></svg><span>Dessin</span></button>
+        <button class="onglet" data-page="image" role="tab">
+          <svg class="ico"><use href="#i-img"/></svg><span>Image</span></button>
+      </nav>
+
+      <button class="profil" data-home title="Retour à l'accueil" aria-label="Retour à l'accueil">
+        <svg class="ico"><use href="#i-user"/></svg>
+      </button>
+    </header>
+
+    <div class="demo-corps">
+
+      <!-- ---------- Page webcam ---------- -->
+      <section class="page active" id="page-webcam">
+        <div class="carte carte-video">
+          <div class="carte-tete">
+            <h2>Caméra</h2>
+            <div class="actions">
+              <button class="btn btn-small btn-primary" id="cam-toggle">Démarrer la caméra</button>
+            </div>
+          </div>
+          <div class="scene" id="scene-cam">
+            <video id="video" autoplay playsinline muted></video>
+            <canvas id="sur"></canvas>
+            <div class="scene-vide" id="cam-vide">
+              <svg class="ico grand"><use href="#i-cam"/></svg>
+              <p>La caméra est éteinte.<br>Clique sur « Démarrer la caméra ».</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="carte carte-reponse">
+          <div class="carte-tete"><h2>Réponse du modèle</h2><span class="etat" id="cam-etat">En attente</span></div>
+          <p class="phrase" id="phrase">Autorise la caméra pour commencer.</p>
+          <div class="puces" id="cam-puces"></div>
+          <label class="interrupteur">
+            <input type="checkbox" id="voix">
+            <span class="piste"></span>
+            Lire la phrase à voix haute
+          </label>
+        </div>
+      </section>
+
+      <!-- ---------- Page dessin ---------- -->
+      <section class="page" id="page-dessin">
+        <div class="carte outils">
+          <h3>Outils</h3>
+          <div class="outils-grille">
+            <button class="outil active" data-outil="stylo" title="Stylo"><svg class="ico"><use href="#i-pen"/></svg></button>
+            <button class="outil" data-outil="gomme" title="Gomme"><svg class="ico"><use href="#i-eraser"/></svg></button>
+          </div>
+
+          <h3>Couleur</h3>
+          <div class="palette" id="palette"></div>
+          <label class="couleur-perso">
+            <input type="color" id="couleur" value="#2f6bff"> Couleur personnalisée
+          </label>
+
+          <h3>Épaisseur <span id="epaisseur-val">6</span></h3>
+          <input type="range" id="epaisseur" min="1" max="40" value="6">
+
+          <h3>Formes</h3>
+          <div class="outils-grille formes" id="formes">
+            <button class="outil" data-forme="rectangle" title="Rectangle"><svg viewBox="0 0 24 24" class="ico"><rect x="3" y="6" width="18" height="12"/></svg></button>
+            <button class="outil" data-forme="carre" title="Carré"><svg viewBox="0 0 24 24" class="ico"><rect x="5" y="5" width="14" height="14"/></svg></button>
+            <button class="outil" data-forme="cercle" title="Cercle"><svg viewBox="0 0 24 24" class="ico"><circle cx="12" cy="12" r="8"/></svg></button>
+            <button class="outil" data-forme="triangle" title="Triangle"><svg viewBox="0 0 24 24" class="ico"><polygon points="12 4 21 20 3 20"/></svg></button>
+            <button class="outil" data-forme="etoile" title="Étoile"><svg viewBox="0 0 24 24" class="ico"><polygon points="12 3 14.8 9 21 9.6 16.3 13.8 17.8 20 12 16.8 6.2 20 7.7 13.8 3 9.6 9.2 9"/></svg></button>
+            <button class="outil" data-forme="losange" title="Losange"><svg viewBox="0 0 24 24" class="ico"><polygon points="12 3 21 12 12 21 3 12"/></svg></button>
+            <button class="outil" data-forme="pentagone" title="Pentagone"><svg viewBox="0 0 24 24" class="ico"><polygon points="12 3 21 10 17.5 20 6.5 20 3 10"/></svg></button>
+            <button class="outil" data-forme="hexagone" title="Hexagone"><svg viewBox="0 0 24 24" class="ico"><polygon points="7 4 17 4 22 12 17 20 7 20 2 12"/></svg></button>
+          </div>
+          <label class="interrupteur petit">
+            <input type="checkbox" id="remplir" checked>
+            <span class="piste"></span> Remplir les formes
+          </label>
+
+          <div class="outils-actions">
+            <button class="btn btn-small btn-ghost" id="annuler"><svg class="ico"><use href="#i-undo"/></svg> Annuler</button>
+            <button class="btn btn-small btn-ghost" id="effacer"><svg class="ico"><use href="#i-trash"/></svg> Tout effacer</button>
+          </div>
+        </div>
+
+        <div class="carte carte-toile">
+          <div class="carte-tete">
+            <h2 id="dessin-titre">Nouveau dessin</h2>
+            <div class="actions">
+              <button class="btn btn-small btn-ghost" id="dessin-nouveau" hidden>Nouveau</button>
+              <button class="btn btn-small btn-ghost" id="dessin-sauver" hidden>Enregistrer</button>
+              <button class="btn btn-small btn-primary" id="dessin-envoyer">
+                <svg class="ico"><use href="#i-send"/></svg> <span id="dessin-envoyer-txt">Envoyer</span></button>
+            </div>
+          </div>
+          <div class="toile-cadre">
+            <canvas id="toile" width="640" height="480"></canvas>
+            <canvas id="toile-ap" width="640" height="480"></canvas>
+          </div>
+          <div class="reponse-bas">
+            <p class="phrase" id="dessin-phrase">Dessine quelque chose puis clique sur « Envoyer ».</p>
+          </div>
+        </div>
+
+        <div class="carte historique">
+          <div class="carte-tete"><h3>Historique</h3><button class="lien-petit" id="dessin-vider">Tout supprimer</button></div>
+          <div class="hist-liste" id="dessin-hist"></div>
+        </div>
+      </section>
+
+      <!-- ---------- Page image ---------- -->
+      <section class="page" id="page-image">
+        <div class="carte carte-envoi">
+          <div class="carte-tete">
+            <h2>Envoyer une image</h2>
+            <div class="actions">
+              <button class="btn btn-small btn-ghost" id="img-reset" hidden>Changer</button>
+              <button class="btn btn-small btn-primary" id="img-envoyer" disabled>
+                <svg class="ico"><use href="#i-send"/></svg> Envoyer</button>
+            </div>
+          </div>
+          <label class="depot" id="depot" for="img-fichier">
+            <input type="file" id="img-fichier" accept="image/*" hidden>
+            <div class="depot-vide" id="depot-vide">
+              <svg class="ico grand"><use href="#i-upload"/></svg>
+              <p><strong>Glisse une image ici</strong><br>ou clique pour parcourir</p>
+            </div>
+            <div class="img-scene" id="img-scene" hidden>
+              <img id="img-apercu" alt="Aperçu de l'image choisie">
+              <canvas id="img-sur"></canvas>
+            </div>
+          </label>
+          <div class="reponse-bas">
+            <p class="phrase" id="img-phrase">Choisis une image pour l'analyser.</p>
+            <div class="puces" id="img-puces"></div>
+          </div>
+        </div>
+
+        <div class="carte historique">
+          <div class="carte-tete"><h3>Historique</h3><button class="lien-petit" id="img-vider">Tout supprimer</button></div>
+          <div class="hist-liste" id="img-hist"></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="index.js"></script>
+</body>
+
+</html>

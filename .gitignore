@@ -1,0 +1,43 @@
+# Environnements virtuels
+venv/
+env/
+.venv/
+.venv
+
+src/__pycache__
+src/__pycache__/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+
+# Modèle et données (versionnés par DVC, pas par Git)
+data/raw/*
+
+!data/raw/*.dvc
+!data/raw/.gitkeep
+data/processed/
+*.pkl
+*.pth
+mlruns/
+mlflow.db
+mlartifacts/
+mlflow.db
+
+# Rapports de monitoring (fichiers HTML lourds)
+monitoring/reports/*.html
+reports
+reports/*.html
+
+# Variables d'environnement (secrets)
+.env
+
+# IDE / OS
+.vscode/
+.DS_Store
+
+# DVC cache local
+.dvc/cache
