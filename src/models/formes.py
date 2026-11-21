@@ -29,15 +29,16 @@ def convertir(xyxy, confiance, classe, noms) -> dict:
 
 
 class DetecteurFormes:
-    def __init__(self, poids: str, conf: float = 0.25, imgsz: int = 640):
+    def __init__(self, poids: str, conf: float = 0.5, imgsz: int = 640):
         from ultralytics import YOLO       # import ici : les tests de conversion n'ont pas besoin d'ultralytics
         self.modele = YOLO(poids)
         self.conf = conf
         self.imgsz = imgsz
 
     def detecter(self, image, conf: float | None = None) -> list[dict]:
+        # agnostic_nms : une même zone ne peut recevoir qu'UNE forme (sinon « pentagone 44 % » et « hexagone 93 % » coexistent)
         res = self.modele.predict(image, conf=self.conf if conf is None else conf,
-                                  imgsz=self.imgsz, verbose=False)[0]
+                                  imgsz=self.imgsz, agnostic_nms=True, verbose=False)[0]
         noms = res.names
         objets = [convertir(b.xyxy[0].tolist(), b.conf[0], b.cls[0], noms) for b in res.boxes]
         return sorted(objets, key=lambda o: (o["boite"][1], o["boite"][0]))   # lecture haut-gauche -> bas-droite
@@ -49,7 +50,7 @@ def main():
     ap = argparse.ArgumentParser(description="Teste le modèle de formes sur une image ou un dossier d'images")
     ap.add_argument("--poids", default="models/formes_v1.pt")
     ap.add_argument("--source", required=True, help="image ou dossier d'images")
-    ap.add_argument("--conf", type=float, default=0.25)
+    ap.add_argument("--conf", type=float, default=0.5, help="seuil de confiance (0.5 par défaut ; plus bas = plus de faux positifs)")
     ap.add_argument("--out", default="reports/predictions", help="dossier des images annotées")
     a = ap.parse_args()
 
