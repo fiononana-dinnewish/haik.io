@@ -23,3 +23,4 @@ pycocotools
 pyyaml
 pytest
 tensorboard
+ultralytics
