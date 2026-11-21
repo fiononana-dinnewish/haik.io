@@ -1,5 +1,13 @@
 """
-Générateur de dataset synthétique « formes + couleurs » pour Haik.io.
+Générateur de dataset synthétique « formes + couleurs » pour Haik.io — VERSION 2.
+
+Ce qui change par rapport à la v1 (d'après les erreurs observées sur de vrais dessins de l'interface) :
+  - formes tracées comme l'OUTIL FORME de l'interface : contour toujours tracé (largeur 1-40 px, jointures
+    arrondies), remplissage optionnel, rectangles/triangles/losanges étirés
+  - formes dessinées au STYLO à main levée : tremblement, coins arrondis, contours ouverts ou qui dépassent,
+    ellipses, traits fins (1-2 px) ou épais comme un pinceau
+  - fonds avec GRIBOUILLIS de pinceau épais (les trous blancs entre les traits ne doivent plus être pris pour des formes)
+  - DISTRACTEURS non annotés qui ne sont pas des formes : cœurs, blobs libres, spirales, vagues, lettres, croix
 
 Sortie (format Ultralytics / YOLO) :
     <out>/images/{train,val,test}/*.jpg
@@ -7,13 +15,9 @@ Sortie (format Ultralytics / YOLO) :
     <out>/meta.csv                          une ligne par objet : forme + COULEUR + boîte (pour le modèle couleur)
     <out>/data.yaml                         fichier de config à donner à YOLO
 
-La forme est apprise par le détecteur. La couleur est annotée à part dans meta.csv
-(un petit classifieur de couleur sera entraîné sur les recadrages).
-
-Usage :
+Usage (à lancer depuis la racine du projet, Haik.io/) :
     python -m src.data.generer_formes --n 20000 --out data/formes --seed 42
     python -m src.data.generer_formes --n 24 --out test_formes --apercu     # vérification visuelle
-(à lancer depuis la racine du projet, Haik.io/)
 """
 import argparse
 import csv
@@ -60,7 +64,7 @@ def distance(c1, c2):
 
 # ----------------------------------------------------------------------------- fonds
 def fond(rng, nprng):
-    t = rng.choices(["blanc", "uni", "degrade", "bruit", "blobs"], weights=[25, 20, 15, 15, 25])[0]
+    t = rng.choices(["blanc", "uni", "degrade", "bruit", "blobs"], weights=[42, 14, 10, 10, 24])[0]
     if t == "blanc":                                    # canvas de dessin
         img = np.full((H, W, 3), 255, np.uint8)
         v = rng.randint(238, 255)
@@ -93,14 +97,28 @@ def fond(rng, nprng):
     return cv2.GaussianBlur(img, (0, 0), rng.randint(15, 40))
 
 
-# ----------------------------------------------------------------------------- géométrie
+# ----------------------------------------------------------------------------- outils géométriques
 def rotation(pts, angle):
     c, s = math.cos(angle), math.sin(angle)
     return [(x * c - y * s, x * s + y * c) for x, y in pts]
 
 
+def tourner(P, a):
+    c, s = math.cos(a), math.sin(a)
+    return np.stack([P[:, 0] * c - P[:, 1] * s, P[:, 0] * s + P[:, 1] * c], 1)
+
+
 def polygone_regulier(n, r, rot=0.0):
     return [(r * math.cos(rot + i * 2 * math.pi / n), r * math.sin(rot + i * 2 * math.pi / n)) for i in range(n)]
+
+
+def epaisseur_aleatoire(rng, r=None):
+    """Largeur de trait entre 1,5 et 34 px (le curseur de l'interface va de 1 à 40), répartie en échelle log :
+    beaucoup de traits fins, quelques gros pinceaux. Plafonnée par la taille de la forme pour qu'elle reste lisible."""
+    e = math.exp(rng.uniform(math.log(1.5), math.log(34)))
+    if r is not None:
+        e = min(e, max(1.5, 0.32 * r))       # au-delà, un contour épais devient un anneau : la forme n'est plus reconnaissable
+    return e
 
 
 def sommets(forme, r, rng):
@@ -108,13 +126,15 @@ def sommets(forme, r, rng):
     if forme == "carre":
         return [(-r, -r), (r, -r), (r, r), (-r, r)]
     if forme == "rectangle":
-        a = rng.uniform(1.35, 2.5)
+        a = rng.uniform(1.25, 3.2)
         hw, hh = r * math.sqrt(a), r / math.sqrt(a)
+        if rng.random() < 0.3:
+            hw, hh = hh, hw                                  # rectangle vertical
         return [(-hw, -hh), (hw, -hh), (hw, hh), (-hw, hh)]
     if forme == "triangle":
         return polygone_regulier(3, r, -math.pi / 2)
     if forme == "losange":
-        k = rng.uniform(0.55, 0.8)
+        k = rng.uniform(0.45, 0.85)
         return [(0, -r), (r * k, 0), (0, r), (-r * k, 0)]
     if forme == "pentagone":
         return polygone_regulier(5, r, -math.pi / 2)
@@ -131,36 +151,200 @@ def sommets(forme, r, rng):
     raise ValueError(forme)
 
 
-def dessiner_objet(img, forme, couleur, cx, cy, r, rng, nprng):
-    """Dessine un objet. Renvoie sa boîte (x0, y0, x1, y1) en pixels."""
-    plein = rng.random() < 0.6
-    epaisseur = -1 if plein else rng.randint(2, max(3, int(r * 0.3)))
-    marge = 0 if plein else epaisseur / 2
+def catmull_rom(C, par_segment=14, ferme=False):
+    """Courbe lisse passant par les points de contrôle C."""
+    C = np.asarray(C, np.float32)
+    P = np.vstack([C[-1], C, C[0], C[1]]) if ferme else np.vstack([C[0], C, C[-1]])
+    t = np.linspace(0, 1, par_segment, endpoint=False)[:, None]
+    morceaux = []
+    for i in range(1, len(P) - 2):
+        p0, p1, p2, p3 = P[i - 1], P[i], P[i + 1], P[i + 2]
+        morceaux.append(0.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t ** 2
+                               + (-p0 + 3 * p1 - 3 * p2 + p3) * t ** 3))
+    morceaux.append(P[-2][None])
+    return np.vstack(morceaux)
 
+
+def densifier(pts, pas=3.0, ferme=True):
+    """Rééchantillonne un tracé à pas régulier."""
+    pts = np.asarray(pts, np.float32)
+    if ferme:
+        pts = np.vstack([pts, pts[:1]])
+    seg = np.diff(pts, axis=0)
+    cum = np.concatenate([[0], np.cumsum(np.hypot(seg[:, 0], seg[:, 1]))])
+    total = float(cum[-1])
+    if total < 1e-3:
+        return pts
+    n = max(8, int(total / pas))
+    s = np.linspace(0, total, n, endpoint=not ferme)
+    return np.stack([np.interp(s, cum, pts[:, 0]), np.interp(s, cum, pts[:, 1])], 1)
+
+
+def chaikin(pts, iters):
+    """Arrondit les coins d'un polygone fermé (un stylo ne fait pas d'angles vifs)."""
+    P = np.asarray(pts, np.float32)
+    for _ in range(iters):
+        Q = np.roll(P, -1, axis=0)
+        P = np.stack([0.75 * P + 0.25 * Q, 0.25 * P + 0.75 * Q], 1).reshape(-1, 2)
+    return P
+
+
+def tremblement(P, r, rng, nprng):
+    """Ondulation lente (main qui dévie) + petit bruit (souris qui accroche)."""
+    n = len(P)
+    u = np.linspace(0, 1, n, endpoint=False)
+    amp = r * rng.uniform(0.008, 0.035)
+    dx, dy = np.zeros(n), np.zeros(n)
+    for f in (2, 3, 5, 7):
+        a = amp / math.sqrt(f)
+        dx += a * np.sin(2 * math.pi * f * u + rng.uniform(0, 6.28))
+        dy += a * np.sin(2 * math.pi * f * u + rng.uniform(0, 6.28))
+    return P + np.stack([dx, dy], 1) + nprng.normal(0, rng.uniform(0.2, 0.8), P.shape)
+
+
+def tracer_trait(img, P, couleur, ep):
+    """Trace un trait à bouts et jointures arrondis (comme le pinceau de l'interface)."""
+    pts = np.round(P).astype(np.int32)
+    e = max(1, int(round(ep)))
+    cv2.polylines(img, [pts.reshape(-1, 1, 2)], False, couleur, e, cv2.LINE_AA)
+    if e >= 4:
+        pas = max(1, e // 4)
+        for p in pts[::pas]:
+            cv2.circle(img, (int(p[0]), int(p[1])), e // 2, couleur, -1, cv2.LINE_AA)
+        cv2.circle(img, (int(pts[-1][0]), int(pts[-1][1])), e // 2, couleur, -1, cv2.LINE_AA)
+
+
+# ----------------------------------------------------------------------------- les deux façons de dessiner une forme
+def chemin_outil(forme, r, rng):
+    """Géométrie exacte, comme l'outil forme de l'interface."""
     if forme == "cercle":
-        a = rng.uniform(0.93, 1.07)                      # quasi-cercle (tracé à la main)
-        ax, ay = int(r), int(r * a)
-        cv2.ellipse(img, (int(cx), int(cy)), (ax, ay), 0, 0, 360, couleur, epaisseur, cv2.LINE_AA)
-        return cx - ax - marge, cy - ay - marge, cx + ax + marge, cy + ay + marge
+        t = np.linspace(0, 2 * math.pi, 120, endpoint=False)
+        return np.stack([r * np.cos(t), r * np.sin(t)], 1)
+    pts = np.array(sommets(forme, r, rng), np.float32)
+    if forme in ("triangle", "losange", "rectangle") and rng.random() < 0.5:
+        pts[:, 0] *= rng.uniform(0.6, 1.6)                  # forme glissée dans un cadre plus large que haut
+    angle = 0.0 if rng.random() < 0.7 else rng.uniform(0, 2 * math.pi)
+    P = tourner(pts, angle)
+    return densifier(P, pas=3.0, ferme=True)
 
-    pts = sommets(forme, r, rng)
-    if forme in ("carre", "rectangle", "losange", "triangle") and rng.random() < 0.5:
-        angle = math.radians(rng.uniform(-15, 15))       # souvent presque droit
+
+def chemin_main_levee(forme, r, rng, nprng):
+    """Forme dessinée à la main au stylo : irrégulière, tremblante, parfois aux coins arrondis."""
+    if forme == "cercle":
+        k = rng.uniform(0.7, 1.35)
+        t = np.linspace(0, 2 * math.pi, 80, endpoint=False)
+        pts = tourner(np.stack([r * np.cos(t), r * k * np.sin(t)], 1), rng.uniform(0, math.pi))
     else:
-        angle = rng.uniform(0, 2 * math.pi)
-    pts = rotation(pts, angle)
-    if rng.random() < 0.4:                               # tremblement de la main
-        sig = r * 0.025
-        pts = [(x + nprng.normal(0, sig), y + nprng.normal(0, sig)) for x, y in pts]
-    pts = [(x + cx, y + cy) for x, y in pts]
+        base = np.array(sommets(forme, r, rng), np.float32)
+        # Irrégularité et arrondi limités : au-delà, un pentagone ou un hexagone devient indiscernable d'un cercle
+        # et l'étiquette serait fausse. Mieux vaut peu d'exemples ambigus que des étiquettes contradictoires.
+        irr = rng.uniform(0.02, 0.05) if forme == "etoile" else rng.uniform(0.03, 0.10)
+        base = base + nprng.normal(0, irr * r, base.shape)
+        angle = rng.uniform(0, 2 * math.pi) if rng.random() < 0.35 else math.radians(rng.uniform(-20, 20))
+        pts = tourner(base, angle)
+        if forme == "etoile":
+            iters = 1 if rng.random() < 0.15 else 0
+        elif forme in ("pentagone", "hexagone"):
+            iters = rng.choices([0, 1, 2], [0.8, 0.19, 0.01])[0]
+        else:
+            iters = rng.choices([0, 1, 2], [0.7, 0.27, 0.03])[0]
+        if iters:
+            pts = chaikin(pts, iters)
+    P = densifier(pts, pas=rng.uniform(2.5, 6.0), ferme=True)
+    return tremblement(P, r, rng, nprng)
 
-    arr = np.array(pts, np.int32).reshape(-1, 1, 2)
+
+def appliquer_ouverture(P, rng):
+    """Un tracé à main levée se ferme rarement parfaitement : fermé, ouvert (trou) ou qui dépasse le point de départ."""
+    n = len(P)
+    P = np.roll(P, -rng.randrange(n), axis=0)
+    mode = rng.choices(["ferme", "ouvert", "depasse"], [0.45, 0.30, 0.25])[0]
+    if mode == "ferme":
+        return np.vstack([P, P[:1]])
+    if mode == "ouvert":
+        return P[: n - max(1, int(n * rng.uniform(0.03, 0.12)))]
+    k = max(2, int(n * rng.uniform(0.04, 0.12)))
+    return np.vstack([P, P[:k] + np.array([rng.uniform(-6, 6), rng.uniform(-6, 6)])])
+
+
+def dessiner_objet(img, forme, couleur, cx, cy, r, style, rng, nprng):
+    """Dessine une forme. Renvoie sa boîte (x0, y0, x1, y1) en pixels."""
+    ep = epaisseur_aleatoire(rng, r)
+    if style == "outil":
+        P = chemin_outil(forme, r, rng) + (cx, cy)
+        plein = rng.random() < 0.5
+        trait = np.vstack([P, P[:1]])             # l'outil forme trace TOUJOURS le contour (remplissage + contour)
+    else:
+        P = chemin_main_levee(forme, r, rng, nprng) + (cx, cy)
+        plein = rng.random() < 0.15
+        trait = np.vstack([P, P[:1]]) if plein else appliquer_ouverture(P, rng)
     if plein:
-        cv2.fillPoly(img, [arr], couleur, cv2.LINE_AA)
+        cv2.fillPoly(img, [np.round(P).astype(np.int32).reshape(-1, 1, 2)], couleur, cv2.LINE_AA)
+    tracer_trait(img, trait, couleur, ep)
+    m = ep / 2 + 1
+    return trait[:, 0].min() - m, trait[:, 1].min() - m, trait[:, 0].max() + m, trait[:, 1].max() + m
+
+
+# ----------------------------------------------------------------------------- éléments qui NE sont PAS des formes
+def distracteur(img, rng, nprng, fin=False):
+    """Dessine un élément non annoté : le modèle doit apprendre à l'ignorer. fin=True : trait fin seulement
+    (utilisé par-dessus les formes, pour ne pas les cacher)."""
+    t = rng.choice(["pinceau", "pinceau", "blob", "blob", "coeur", "spirale", "vague", "lettre", "croix"])
+    couleur = couleur_aleatoire(rng.choice(list(COULEURS)), rng)
+    ep = float(rng.choice([2, 3, 4])) if fin else epaisseur_aleatoire(rng)
+    cx, cy = rng.uniform(0.15 * W, 0.85 * W), rng.uniform(0.15 * H, 0.85 * H)
+    R = rng.uniform(25, 120)
+    plein = (not fin) and rng.random() < 0.25
+
+    if t == "pinceau":
+        C = [(rng.uniform(0, W), rng.uniform(0, H)) for _ in range(rng.randint(3, 6))]
+        tracer_trait(img, catmull_rom(C, 16), couleur, ep if fin else rng.uniform(12, 40))
+        return
+    if t == "lettre":
+        txt = rng.choice("BCEFGHJKLMNPRSTUXYZ1234" "57")      # sans O, Q, D, 0, 6, 8, 9, A, V : trop proches d'une forme
+        police = rng.choice([cv2.FONT_HERSHEY_SIMPLEX, cv2.FONT_HERSHEY_DUPLEX, cv2.FONT_HERSHEY_SCRIPT_SIMPLEX])
+        cv2.putText(img, txt, (int(cx - R / 2), int(cy + R / 2)), police, R / 22, couleur,
+                    min(12, max(2, int(ep / 2))), cv2.LINE_AA)
+        return
+    if t == "croix":
+        L = R
+        if rng.random() < 0.5:
+            segs = [[(-L, 0), (L, 0)], [(0, -L), (0, L)]]
+        else:
+            segs = [[(-L, -L), (L, L)], [(-L, L), (L, -L)]]
+        for s in segs:
+            tracer_trait(img, np.array(s, np.float32) + (cx, cy), couleur, ep)
+        return
+
+    if t == "blob":                                  # courbe fermée irrégulière : clairement pas un cercle
+        th = np.linspace(0, 2 * math.pi, 120, endpoint=False)
+        rad = np.ones_like(th)
+        for h in (2, 3, 4, 5):
+            rad += rng.uniform(0.06, 0.3) / math.sqrt(h) * np.cos(h * th + rng.uniform(0, 6.28))
+        rad = np.clip(rad, 0.35, None)
+        P = tourner(np.stack([R * rad * np.cos(th), R * rng.uniform(0.6, 1.2) * rad * np.sin(th)], 1), rng.uniform(0, math.pi))
+    elif t == "coeur":
+        tt = np.linspace(0, 2 * math.pi, 100)
+        P = np.stack([16 * np.sin(tt) ** 3, -(13 * np.cos(tt) - 5 * np.cos(2 * tt) - 2 * np.cos(3 * tt) - np.cos(4 * tt))], 1) * (R / 17)
+        P = tourner(P, math.radians(rng.uniform(-25, 25)))
+    elif t == "spirale":
+        th = np.linspace(0, 2 * math.pi * rng.uniform(2, 4), 160)
+        rr = R * th / th.max()
+        P = np.stack([rr * np.cos(th), rr * np.sin(th)], 1)
+        plein = False
+    else:                                            # vague ou zigzag
+        L = rng.uniform(100, 300)
+        xs = np.linspace(-L / 2, L / 2, 80)
+        f, A = rng.uniform(2, 5), rng.uniform(8, 30)
+        onde = np.sin(2 * math.pi * f * xs / L)
+        ys = A * onde if rng.random() < 0.6 else A * (2 / math.pi) * np.arcsin(onde)
+        P = tourner(np.stack([xs, ys], 1), rng.uniform(0, math.pi))
+        plein = False
+    P = P + (cx, cy)
+    if plein:
+        cv2.fillPoly(img, [np.round(P).astype(np.int32).reshape(-1, 1, 2)], couleur, cv2.LINE_AA)
     else:
-        cv2.polylines(img, [arr], True, couleur, epaisseur, cv2.LINE_AA)
-    xs, ys = [p[0] for p in pts], [p[1] for p in pts]
-    return min(xs) - marge, min(ys) - marge, max(xs) + marge, max(ys) + marge
+        tracer_trait(img, np.vstack([P, P[:1]]) if t in ("blob", "coeur") else P, couleur, ep)
 
 
 def trop_proche(b, autres):
@@ -177,40 +361,57 @@ def trop_proche(b, autres):
 # ----------------------------------------------------------------------------- une image
 def generer_image(rng, nprng):
     img = fond(rng, nprng)
-    mode_dessin = img.mean() > 235 and rng.random() < 0.7
+    blanc = img.mean() > 235
+
+    # 1. Décor sous les formes : gribouillis de gros pinceau (comme dans les tests réels) et/ou distracteurs
+    if rng.random() < 0.28:
+        base = couleur_aleatoire(rng.choice(list(COULEURS)), rng)
+        for _ in range(rng.randint(3, 9)):
+            C = [(rng.uniform(-30, W + 30), rng.uniform(-30, H + 30)) for _ in range(rng.randint(2, 4))]
+            c = base if rng.random() < 0.8 else couleur_aleatoire(rng.choice(list(COULEURS)), rng)
+            tracer_trait(img, catmull_rom(C, 16), c, rng.uniform(22, 46))
+        n_dis = rng.choices([0, 1, 2], [60, 30, 10])[0]
+    elif blanc or rng.random() < 0.5:
+        n_dis = rng.choices([0, 1, 2, 3, 4], [38, 25, 17, 13, 7])[0]
+    else:
+        n_dis = rng.choices([0, 1], [75, 25])[0]
+    for _ in range(n_dis):
+        distracteur(img, rng, nprng)
+
+    # 2. Formes annotées
     n_obj = rng.choices([0, 1, 2, 3, 4, 5], weights=[4, 33, 25, 18, 12, 8])[0]
     objets, boites = [], []
-
     essais = 0
-    while len(objets) < n_obj and essais < 60:
+    while len(objets) < n_obj and essais < 80:
         essais += 1
         forme = rng.choice(FORMES)
         nom_c = rng.choice(list(COULEURS))
-        r = rng.uniform(0.06, 0.30 if n_obj <= 2 else 0.2) * H
-        cx = rng.uniform(r * 1.5, W - r * 1.5)               # 1.5 > racine de 2 : un carré tourné reste dans l'image
+        style = "main" if rng.random() < 0.55 else "outil"
+        r = rng.uniform(0.05, 0.30 if n_obj <= 2 else 0.2) * H
+        cx = rng.uniform(r * 1.5, W - r * 1.5)               # 1.5 > racine de 2 : une forme tournée reste dans l'image
         cy = rng.uniform(r * 1.5, H - r * 1.5)
         couleur = couleur_aleatoire(nom_c, rng)
-        fond_local = img[int(cy), int(cx)]
-        if distance(couleur, fond_local) < 90:           # trop peu contrasté : on repart
-            continue
-        if mode_dessin and nom_c == "blanc":
-            continue
         copie = img.copy()
-        b = dessiner_objet(copie, forme, couleur, cx, cy, r, rng, nprng)
+        b = dessiner_objet(copie, forme, couleur, cx, cy, r, style, rng, nprng)
         b = (max(0, b[0]), max(0, b[1]), min(W - 1, b[2]), min(H - 1, b[3]))
         if (b[2] - b[0]) < 12 or (b[3] - b[1]) < 12 or trop_proche(b, boites):
+            continue
+        # La forme doit être visible : contraste moyen suffisant sur les pixels qu'elle a modifiés
+        x0, y0, x1, y1 = int(b[0]), int(b[1]), int(b[2]) + 1, int(b[3]) + 1
+        diff = np.abs(copie[y0:y1, x0:x1].astype(np.int16) - img[y0:y1, x0:x1].astype(np.int16)).max(axis=2)
+        masque = diff > 10
+        if masque.sum() < 30 or diff[masque].mean() < 40:
             continue
         img = copie
         boites.append(b)
         objets.append((forme, nom_c, b))
 
-    # Distracteurs non annotés (traits fins) pour éviter les faux positifs
+    # 3. Traits fins parasites par-dessus (n'altèrent pas les formes)
     if rng.random() < 0.15:
-        for _ in range(rng.randint(1, 3)):
-            pts = np.array([(rng.randint(0, W), rng.randint(0, H)) for _ in range(rng.randint(2, 5))], np.int32)
-            cv2.polylines(img, [pts.reshape(-1, 1, 2)], False, tuple(rng.randint(0, 255) for _ in range(3)), 1, cv2.LINE_AA)
+        for _ in range(rng.randint(1, 2)):
+            distracteur(img, rng, nprng, fin=True)
 
-    # Dégradations réalistes (webcam / photo) — après annotation, les boîtes ne bougent pas
+    # 4. Dégradations réalistes (webcam / photo) — après annotation, les boîtes ne bougent pas
     img = img.astype(np.float32)
     img = img * rng.uniform(0.75, 1.2) + rng.uniform(-20, 20)
     if rng.random() < 0.5:
@@ -239,9 +440,8 @@ def apercu(out, nb=12):
     for f in fichiers:
         img = cv2.imread(str(f))
         lab = out / "labels" / f.parent.name / (f.stem + ".txt")
-        meta = {}
         if lab.exists():
-            for i, ligne in enumerate(lab.read_text().split("\n")):
+            for ligne in lab.read_text().split("\n"):
                 if not ligne.strip():
                     continue
                 c, x, y, w, h = ligne.split()
