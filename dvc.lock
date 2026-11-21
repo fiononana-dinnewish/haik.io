@@ -1,0 +1,38 @@
+schema: '2.0'
+stages:
+  generer_formes:
+    cmd: python -m src.data.generer_formes --n 20000 --seed 42 --out data/formes
+    deps:
+    - path: src/data/generer_formes.py
+      hash: md5
+      md5: 859eb01f7322d257a5d6d71aadb41481
+      size: 13241
+    params:
+      params.yaml:
+        formes:
+          n_images: 20000
+          seed: 42
+    outs:
+    - path: data/formes
+      hash: md5
+      md5: 4aabe65e131ee1fab2dbdc1658027104.dir
+      size: 369110997
+      nfiles: 40002
+  valider_formes:
+    cmd: python -m src.data.valider_dataset --dataset data/formes --out 
+      reports/dataset_stats.json
+    deps:
+    - path: data/formes
+      hash: md5
+      md5: 4aabe65e131ee1fab2dbdc1658027104.dir
+      size: 369110997
+      nfiles: 40002
+    - path: src/data/valider_dataset.py
+      hash: md5
+      md5: 8183a46ffb171446d0b0539bb9e2a38c
+      size: 3790
+    outs:
+    - path: reports/dataset_stats.json
+      hash: md5
+      md5: 1b4de928f3fde142e4e220c3171c5102
+      size: 689

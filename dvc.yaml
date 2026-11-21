@@ -1,0 +1,18 @@
+stages:
+  generer_formes:
+    cmd: python -m src.data.generer_formes --n ${formes.n_images} --seed ${formes.seed} --out data/formes
+    deps:
+      - src/data/generer_formes.py
+    params:
+      - formes
+    outs:
+      - data/formes
+
+  valider_formes:
+    cmd: python -m src.data.valider_dataset --dataset data/formes --out reports/dataset_stats.json
+    deps:
+      - src/data/valider_dataset.py
+      - data/formes
+    metrics:
+      - reports/dataset_stats.json:
+          cache: false

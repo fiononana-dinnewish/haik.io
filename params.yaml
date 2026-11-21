@@ -1,0 +1,10 @@
+# Paramètres suivis par DVC : si tu changes une valeur ici, « dvc repro » ne relance que les étapes concernées.
+formes:
+  n_images: 20000     # taille du dataset synthétique (≈ 8 min de génération)
+  seed: 42            # même seed = exactement le même dataset
+
+entrainement_formes:  # utilisé par le notebook Colab (étape suivante)
+  modele: yolo11s.pt
+  epochs: 50
+  imgsz: 640
+  batch: 15

@@ -1,0 +1,37 @@
+{
+  "images": 20000,
+  "images_sans_objet": 767,
+  "objets": 45239,
+  "par_split": {
+    "train": 16000,
+    "val": 2000,
+    "test": 2000
+  },
+  "par_classe": {
+    "etoile": 5734,
+    "cercle": 5593,
+    "pentagone": 5734,
+    "hexagone": 5689,
+    "losange": 6070,
+    "triangle": 5935,
+    "carre": 5230,
+    "rectangle": 5254
+  },
+  "par_couleur": {
+    "orange": 4040,
+    "bleu": 3844,
+    "marron": 4077,
+    "jaune": 4033,
+    "noir": 4293,
+    "rouge": 4127,
+    "violet": 3589,
+    "blanc": 3354,
+    "rose": 3765,
+    "gris": 2527,
+    "vert": 3757,
+    "cyan": 3833
+  },
+  "desequilibre_classes": 1.161,
+  "nb_erreurs": 0,
+  "erreurs": []
+}
