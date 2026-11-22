@@ -14,7 +14,7 @@ from flask import Flask, jsonify, request
 
 from src.phrase import decrire
 
-POIDS = os.environ.get("HAIK_POIDS", "models/best.pt")
+POIDS = os.environ.get("HAIK_POIDS", "models/best_2.pt")
 CONF = float(os.environ.get("HAIK_CONF", "0.5"))
 SEUIL_COULEUR = 0.8       # en dessous, la couleur est jugée peu fiable (cf. reports/couleur_eval.json)
 
