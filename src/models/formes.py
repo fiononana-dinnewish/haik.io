@@ -41,6 +41,9 @@ class DetecteurFormes:
                                   imgsz=self.imgsz, agnostic_nms=True, verbose=False)[0]
         noms = res.names
         objets = [convertir(b.xyxy[0].tolist(), b.conf[0], b.cls[0], noms) for b in res.boxes]
+        from src.models.couleur import couleur_objet
+        for o in objets:
+            o["couleur"], o["couleur_confiance"] = couleur_objet(image, o["boite"])
         return sorted(objets, key=lambda o: (o["boite"][1], o["boite"][0]))   # lecture haut-gauche -> bas-droite
 
 
