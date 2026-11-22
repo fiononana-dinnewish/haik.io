@@ -17,7 +17,7 @@ COULEURS = {
     "bleu":    [((100, 121), (130, 255), (110, 255))],
     "violet":  [((124, 148), (90, 255), (90, 255))],
     "rose":    [((150, 168), (70, 170), (200, 255))],
-    "marron":  [((8, 18), (150, 230), (75, 135))],
+    "marron":  [((8, 24), (85, 230), (60, 165))],
     "gris":    [((0, 179), (0, 50), (95, 205))],        # le gris de l'interface est légèrement bleuté (S ≈ 43)
     "noir":    [((0, 179), (0, 255), (0, 62))],         # le « noir » de l'interface est un bleu nuit très sombre (V ≈ 61)
     "blanc":   [((0, 179), (0, 25), (215, 255))]       # un blanc un peu assombri par la lumière reste blanc,
